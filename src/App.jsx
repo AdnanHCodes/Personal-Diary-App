@@ -1,10 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "./supabase";
 import "./App.css";
 
 function App() {
   const [entry, setEntry] = useState("");
   const [entries, setEntries] = useState([]);
   const [isListening, setIsListening] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load entries from Supabase when the app starts
+  useEffect(() => {
+    loadEntries();
+  }, []);
+
+  const loadEntries = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("entries")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading entries:", error);
+    } else {
+      setEntries(data);
+    }
+    setLoading(false);
+  };
 
   const applyPunctuation = (text) => {
     let result = text
@@ -32,20 +54,22 @@ function App() {
     return result;
   };
 
-  const saveEntry = () => {
+  const saveEntry = async () => {
     if (entry.trim() === "") return;
-    const newEntry = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-      content: applyPunctuation(entry),
-    };
-    setEntries([newEntry, ...entries]);
-    setEntry("");
+    const cleanedEntry = applyPunctuation(entry);
+
+    const { data, error } = await supabase
+      .from("entries")
+      .insert([{ content: cleanedEntry }])
+      .select();
+
+    if (error) {
+      console.error("Error saving entry:", error);
+      alert("Failed to save entry. Please try again.");
+    } else {
+      setEntries([data[0], ...entries]);
+      setEntry("");
+    }
   };
 
   const startListening = () => {
@@ -133,12 +157,21 @@ function App() {
 
       <section className="entries-list">
         <h2>Past Entries</h2>
-        {entries.length === 0 ? (
+        {loading ? (
+          <p className="no-entries">Loading entries...</p>
+        ) : entries.length === 0 ? (
           <p className="no-entries">No entries yet. Start writing!</p>
         ) : (
           entries.map((e) => (
             <div key={e.id} className="entry-card">
-              <p className="entry-date">{e.date}</p>
+              <p className="entry-date">
+                {new Date(e.created_at).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
               <p className="entry-content">{e.content}</p>
             </div>
           ))
