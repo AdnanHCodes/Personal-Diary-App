@@ -33,12 +33,18 @@ body {
   color: #888;
 }
 
-.input-section {
+.input-section, .tasks-section, .entries-list {
   background: white;
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   margin-bottom: 40px;
+}
+
+.input-section h2, .tasks-section h2, .entries-list h2 {
+  font-size: 1.4rem;
+  color: #4a3728;
+  margin-bottom: 20px;
 }
 
 .entry-input {
@@ -94,6 +100,11 @@ body {
   transition: background-color 0.2s ease;
 }
 
+.mic-button.small {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
 .mic-button:hover {
   background-color: #d4c9be;
 }
@@ -126,17 +137,90 @@ body {
   background-color: #6b5344;
 }
 
-.entries-list {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+.task-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.entries-list h2 {
-  font-size: 1.4rem;
-  color: #4a3728;
-  margin-bottom: 20px;
+.task-title-row {
+  display: flex;
+  gap: 12px;
+}
+
+.task-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e8e0d8;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  color: #333;
+  background-color: #fdfcfb;
+}
+
+.task-input:focus {
+  border-color: #4a3728;
+}
+
+.task-date-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e8e0d8;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  color: #333;
+  background-color: #fdfcfb;
+}
+
+.task-date-input:focus {
+  border-color: #4a3728;
+}
+
+.task-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 4px solid #e0a800;
+  padding: 16px;
+  margin-bottom: 12px;
+  background-color: #fdfcfb;
+  border-radius: 0 10px 10px 0;
+}
+
+.task-info {
+  flex: 1;
+}
+
+.task-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.task-due {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.delete-button {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.delete-button:hover {
+  color: #e74c3c;
 }
 
 .no-entries {
