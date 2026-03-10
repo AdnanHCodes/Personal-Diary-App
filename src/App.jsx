@@ -11,6 +11,11 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueAt, setTaskDueAt] = useState("");
+  const [expandedEntry, setExpandedEntry] = useState(null);
+  const [expandedTask, setExpandedTask] = useState(null);
+  const [showEntries, setShowEntries] = useState(true);
+  const [showTasks, setShowTasks] = useState(true);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
     loadEntries();
@@ -101,43 +106,91 @@ function App() {
     return result;
   };
 
+  const formatDateTime = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getPreview = (text, length = 40) => {
+    return text.length > length ? text.substring(0, length) + "..." : text;
+  };
+
   const saveEntry = async () => {
     if (entry.trim() === "") return;
-    const cleanedEntry = applyPunctuation(entry);
-    const { data, error } = await supabase
-      .from("entries")
-      .insert([{ content: cleanedEntry }])
-      .select();
-    if (error) {
-      console.error("Error saving entry:", error);
-      alert("Failed to save entry. Please try again.");
-    } else {
-      setEntries([data[0], ...entries]);
-      setEntry("");
-    }
+    setConfirmAction({
+      message: "Are you sure you want to save this diary entry?",
+      onConfirm: async () => {
+        const cleanedEntry = applyPunctuation(entry);
+        const { data, error } = await supabase
+          .from("entries")
+          .insert([{ content: cleanedEntry }])
+          .select();
+        if (error) {
+          console.error("Error saving entry:", error);
+          alert("Failed to save entry. Please try again.");
+        } else {
+          setEntries([data[0], ...entries]);
+          setEntry("");
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
   };
 
   const saveTask = async () => {
     if (taskTitle.trim() === "" || taskDueAt === "") return;
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert([{ title: taskTitle, due_at: taskDueAt }])
-      .select();
-    if (error) {
-      console.error("Error saving task:", error);
-      alert("Failed to save task. Please try again.");
-    } else {
-      setTasks([...tasks, data[0]].sort(
-        (a, b) => new Date(a.due_at) - new Date(b.due_at)
-      ));
-      setTaskTitle("");
-      setTaskDueAt("");
-    }
+    setConfirmAction({
+      message: "Are you sure you want to add this task?",
+      onConfirm: async () => {
+        const { data, error } = await supabase
+          .from("tasks")
+          .insert([{ title: taskTitle, due_at: taskDueAt }])
+          .select();
+        if (error) {
+          console.error("Error saving task:", error);
+          alert("Failed to save task. Please try again.");
+        } else {
+          setTasks([...tasks, data[0]].sort(
+            (a, b) => new Date(a.due_at) - new Date(b.due_at)
+          ));
+          setTaskTitle("");
+          setTaskDueAt("");
+        }
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
   };
 
-  const deleteTask = async (id) => {
-    await supabase.from("tasks").delete().eq("id", id);
-    setTasks(tasks.filter((t) => t.id !== id));
+  const deleteTask = (id) => {
+    setConfirmAction({
+      message: "Are you sure you want to delete this task?",
+      onConfirm: async () => {
+        await supabase.from("tasks").delete().eq("id", id);
+        setTasks(tasks.filter((t) => t.id !== id));
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
+  };
+
+  const deleteEntry = (id) => {
+    setConfirmAction({
+      message: "Are you sure you want to delete this diary entry?",
+      onConfirm: async () => {
+        await supabase.from("entries").delete().eq("id", id);
+        setEntries(entries.filter((e) => e.id !== id));
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
   };
 
   const startListening = (setter, setListening) => {
@@ -173,54 +226,185 @@ function App() {
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>My Personal Diary</h1>
-        <p>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-      </header>
 
-      <main className="input-section">
-        <h2>Today's Entry</h2>
-        <textarea
-          className="entry-input"
-          placeholder="Write about your day or press the microphone to speak..."
-          value={entry}
-          onChange={(e) => setEntry(e.target.value)}
-        />
-        <div className="voice-hints">
-          <span>Voice commands:</span>
-          <code>comma</code>
-          <code>period</code>
-          <code>question mark</code>
-          <code>exclamation mark</code>
-          <code>new line</code>
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <p className="modal-message">{confirmAction.message}</p>
+            <div className="modal-buttons">
+              <button className="modal-confirm" onClick={confirmAction.onConfirm}>
+                Yes, confirm
+              </button>
+              <button className="modal-cancel" onClick={confirmAction.onCancel}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="button-group">
+      )}
+
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1>📔 My Diary</h1>
+          <p className="sidebar-date">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+
+        {/* Entries List */}
+        <div className="sidebar-section">
           <button
-            className={`mic-button ${isListening ? "listening" : ""}`}
-            onClick={() =>
-              isListening
-                ? stopListening(setIsListening)
-                : startListening(setEntry, setIsListening)
-            }
+            className="sidebar-section-toggle"
+            onClick={() => setShowEntries(!showEntries)}
           >
-            {isListening ? "⏹ Stop" : "🎤 Speak"}
+            <span>📝 Diary Entries</span>
+            <span>{showEntries ? "▲" : "▼"}</span>
           </button>
-          <button className="save-button" onClick={saveEntry}>
-            Save Entry
-          </button>
+          {showEntries && (
+            <div className="sidebar-list">
+              {loading ? (
+                <p className="sidebar-empty">Loading...</p>
+              ) : entries.length === 0 ? (
+                <p className="sidebar-empty">No entries yet.</p>
+              ) : (
+                entries.map((e) => (
+                  <div
+                    key={e.id}
+                    className={`sidebar-item ${expandedEntry === e.id ? "active" : ""}`}
+                  >
+                    <div
+                      className="sidebar-item-header"
+                      onClick={() =>
+                        setExpandedEntry(expandedEntry === e.id ? null : e.id)
+                      }
+                    >
+                      <p className="sidebar-item-date">{formatDateTime(e.created_at)}</p>
+                      <p className="sidebar-item-preview">{getPreview(e.content)}</p>
+                    </div>
+                    {expandedEntry === e.id && (
+                      <div className="sidebar-item-expanded">
+                        <p className="sidebar-item-content">{e.content}</p>
+                        <button
+                          className="sidebar-delete"
+                          onClick={() => deleteEntry(e.id)}
+                        >
+                          🗑 Delete Entry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
-      </main>
 
-      <section className="tasks-section">
-        <h2>Upcoming Tasks</h2>
-        <div className="task-input-group">
+        {/* Tasks List */}
+        <div className="sidebar-section">
+          <button
+            className="sidebar-section-toggle"
+            onClick={() => setShowTasks(!showTasks)}
+          >
+            <span>📌 Upcoming Tasks</span>
+            <span>{showTasks ? "▲" : "▼"}</span>
+          </button>
+          {showTasks && (
+            <div className="sidebar-list">
+              {tasks.length === 0 ? (
+                <p className="sidebar-empty">No tasks yet.</p>
+              ) : (
+                tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`sidebar-item ${expandedTask === task.id ? "active" : ""}`}
+                  >
+                    <div
+                      className="sidebar-item-header"
+                      onClick={() =>
+                        setExpandedTask(expandedTask === task.id ? null : task.id)
+                      }
+                    >
+                      <p className="sidebar-item-date">{formatDateTime(task.due_at)}</p>
+                      <p className="sidebar-item-preview">{getPreview(task.title)}</p>
+                    </div>
+                    {expandedTask === task.id && (
+                      <div className="sidebar-item-expanded">
+                        <p className="sidebar-item-content">{task.title}</p>
+                        <button
+                          className="sidebar-delete"
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          🗑 Delete Task
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="main-content">
+        <header className="main-header">
+          <h2>Good {new Date().getHours() < 12 ? "Morning" : new Date().getHours() < 18 ? "Afternoon" : "Evening"} 👋</h2>
+          <p className="main-date">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </header>
+
+        {/* New Diary Entry */}
+        <section className="card">
+          <h3>Today's Entry</h3>
+          <textarea
+            className="entry-input"
+            placeholder="Write about your day or press the microphone to speak..."
+            value={entry}
+            onChange={(e) => setEntry(e.target.value)}
+          />
+          <div className="voice-hints">
+            <span>Voice commands:</span>
+            <code>comma</code>
+            <code>period</code>
+            <code>question mark</code>
+            <code>exclamation mark</code>
+            <code>new line</code>
+          </div>
+          <div className="button-group">
+            <button
+              className={`mic-button ${isListening ? "listening" : ""}`}
+              onClick={() =>
+                isListening
+                  ? stopListening(setIsListening)
+                  : startListening(setEntry, setIsListening)
+              }
+            >
+              {isListening ? "⏹ Stop" : "🎤 Speak"}
+            </button>
+            <button className="save-button" onClick={saveEntry}>
+              Save Entry
+            </button>
+          </div>
+        </section>
+
+        {/* New Task */}
+        <section className="card">
+          <h3>Add a Task</h3>
           <div className="task-title-row">
             <input
               type="text"
@@ -249,59 +433,8 @@ function App() {
           <button className="save-button" onClick={saveTask}>
             Add Task
           </button>
-        </div>
-
-        {tasks.length === 0 ? (
-          <p className="no-entries">No upcoming tasks. Add one above!</p>
-        ) : (
-          tasks.map((task) => (
-            <div key={task.id} className="task-card">
-              <div className="task-info">
-                <p className="task-title">{task.title}</p>
-                <p className="task-due">
-                  {new Date(task.due_at).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-              <button
-                className="delete-button"
-                onClick={() => deleteTask(task.id)}
-              >
-                ✕
-              </button>
-            </div>
-          ))
-        )}
-      </section>
-
-      <section className="entries-list">
-        <h2>Past Entries</h2>
-        {loading ? (
-          <p className="no-entries">Loading entries...</p>
-        ) : entries.length === 0 ? (
-          <p className="no-entries">No entries yet. Start writing!</p>
-        ) : (
-          entries.map((e) => (
-            <div key={e.id} className="entry-card">
-              <p className="entry-date">
-                {new Date(e.created_at).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-              <p className="entry-content">{e.content}</p>
-            </div>
-          ))
-        )}
-      </section>
+        </section>
+      </main>
     </div>
   );
 }
