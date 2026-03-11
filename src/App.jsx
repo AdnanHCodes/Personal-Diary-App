@@ -7,12 +7,14 @@ function App() {
   const [entries, setEntries] = useState([]);
   const [isListening, setIsListening] = useState(false);
   const [isListeningTask, setIsListeningTask] = useState(false);
+  const [activeTab, setActiveTab] = useState("entry");
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueAt, setTaskDueAt] = useState("");
-  const [showEntries, setShowEntries] = useState(true);
-  const [showTasks, setShowTasks] = useState(true);
+  const [showEntries, setShowEntries] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [centerView, setCenterView] = useState("new");
   const [selectedItem, setSelectedItem] = useState(null);
@@ -90,6 +92,18 @@ function App() {
     }
   };
 
+  const getTodayEntries = () => {
+    const today = new Date();
+    return entries.filter((e) => {
+      const entryDate = new Date(e.created_at);
+      return (
+        entryDate.getDate() === today.getDate() &&
+        entryDate.getMonth() === today.getMonth() &&
+        entryDate.getFullYear() === today.getFullYear()
+      );
+    });
+  };
+
   const applyPunctuation = (text) => {
     let result = text
       .replace(/\bcomma\b/gi, ",")
@@ -115,6 +129,13 @@ function App() {
       year: "numeric",
       month: "long",
       day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatTime = (dateString) => {
+    return new Date(dateString).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -281,6 +302,8 @@ function App() {
     setListening(false);
   };
 
+  const todayEntries = getTodayEntries();
+
   return (
     <div className="app">
 
@@ -302,15 +325,34 @@ function App() {
       )}
 
       {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h1>📔 My Diary</h1>
+{/* Sidebar */}
+<aside className={`sidebar ${sidebarOpen ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+
+  {/* Icon bar — always rendered, visible when collapsed */}
+  {!sidebarOpen && (
+    <div className="sidebar-icon-bar">
+      <div className="sidebar-icon" title="My Diary" onClick={() => setSidebarOpen(true)}>📔</div>
+      <div className="sidebar-icon" title="New Entry" onClick={() => { setSidebarOpen(true); closeItem(); }}>➕</div>
+      <div className="sidebar-icon" title="Diary Entries" onClick={() => { setSidebarOpen(true); setShowEntries(true); }}>📝</div>
+      <div className="sidebar-icon" title="Upcoming Tasks" onClick={() => { setSidebarOpen(true); setShowTasks(true); }}>📌</div>
+    </div>
+  )}
+
+  {/* Full content — always rendered, visible when expanded */}
+  {sidebarOpen && (
+    <div className="sidebar-full-content">
+      <div className="sidebar-header">
+        <h1>📔 My Diary</h1>
+        <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+      </div>
+
+      <div className="sidebar-scrollable">
+        <div className="sidebar-new-entry">
           <button className="new-entry-button" onClick={closeItem}>
             + New Entry
           </button>
         </div>
 
-        {/* Entries List */}
         <div className="sidebar-section">
           <button
             className="sidebar-section-toggle"
@@ -319,7 +361,7 @@ function App() {
             <span>📝 Diary Entries</span>
             <span>{showEntries ? "▲" : "▼"}</span>
           </button>
-          {showEntries && (
+          <div className={`sidebar-accordion ${showEntries ? "accordion-open" : ""}`}>
             <div className="sidebar-list">
               {loading ? (
                 <p className="sidebar-empty">Loading...</p>
@@ -338,10 +380,9 @@ function App() {
                 ))
               )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Tasks List */}
         <div className="sidebar-section">
           <button
             className="sidebar-section-toggle"
@@ -350,7 +391,7 @@ function App() {
             <span>📌 Upcoming Tasks</span>
             <span>{showTasks ? "▲" : "▼"}</span>
           </button>
-          {showTasks && (
+          <div className={`sidebar-accordion ${showTasks ? "accordion-open" : ""}`}>
             <div className="sidebar-list">
               {tasks.length === 0 ? (
                 <p className="sidebar-empty">No tasks yet.</p>
@@ -367,9 +408,12 @@ function App() {
                 ))
               )}
             </div>
-          )}
+          </div>
         </div>
-      </aside>
+      </div>
+    </div>
+  )}
+</aside>
 
       {/* Main Content */}
       <main className="main-content">
@@ -390,72 +434,144 @@ function App() {
               </p>
             </header>
 
-            {/* New Diary Entry */}
-            <section className="card">
-              <h3>Today's Entry</h3>
-              <textarea
-                className="entry-input"
-                placeholder="Write about your day or press the microphone to speak..."
-                value={entry}
-                onChange={(e) => setEntry(e.target.value)}
-              />
-              <div className="voice-hints">
-                <span>Voice commands:</span>
-                <code>comma</code>
-                <code>period</code>
-                <code>question mark</code>
-                <code>exclamation mark</code>
-                <code>new line</code>
-              </div>
-              <div className="button-group">
-                <button
-                  className={`mic-button ${isListening ? "listening" : ""}`}
-                  onClick={() =>
-                    isListening
-                      ? stopListening(setIsListening)
-                      : startListening(setEntry, setIsListening)
-                  }
-                >
-                  {isListening ? "⏹ Stop" : "🎤 Speak"}
-                </button>
-                <button className="save-button" onClick={saveEntry}>
-                  Save Entry
-                </button>
-              </div>
-            </section>
+         {/* Tabbed Input Section */}
+<div className="tab-card">
+  <div className="tab-bar">
+    <button
+      className={`tab-button ${activeTab === "entry" ? "tab-active" : ""}`}
+      onClick={() => setActiveTab("entry")}
+    >
+      📝 Today's Entry
+    </button>
+    <button
+      className={`tab-button ${activeTab === "task" ? "tab-active" : ""}`}
+      onClick={() => setActiveTab("task")}
+    >
+      📌 Add a Task
+    </button>
+  </div>
 
-            {/* New Task */}
-            <section className="card">
-              <h3>Add a Task</h3>
-              <div className="task-title-row">
-                <input
-                  type="text"
-                  className="task-input"
-                  placeholder="Task title..."
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                />
-                <button
-                  className={`mic-button small ${isListeningTask ? "listening" : ""}`}
-                  onClick={() =>
-                    isListeningTask
-                      ? stopListening(setIsListeningTask)
-                      : startListening(setTaskTitle, setIsListeningTask)
-                  }
-                >
-                  {isListeningTask ? "⏹" : "🎤"}
-                </button>
-              </div>
-              <input
-                type="datetime-local"
-                className="task-date-input"
-                value={taskDueAt}
-                onChange={(e) => setTaskDueAt(e.target.value)}
-              />
-              <button className="save-button" onClick={saveTask}>
-                Add Task
-              </button>
-            </section>
+  {activeTab === "entry" && (
+    <div className="tab-content">
+      <textarea
+        className="entry-input"
+        placeholder="Write about your day or press the microphone to speak..."
+        value={entry}
+        onChange={(e) => setEntry(e.target.value)}
+      />
+      <div className="voice-hints">
+        <span>Voice commands:</span>
+        <code>comma</code>
+        <code>period</code>
+        <code>question mark</code>
+        <code>exclamation mark</code>
+        <code>new line</code>
+      </div>
+      <div className="button-group">
+        <button
+          className={`mic-button ${isListening ? "listening" : ""}`}
+          onClick={() =>
+            isListening
+              ? stopListening(setIsListening)
+              : startListening(setEntry, setIsListening)
+          }
+        >
+          {isListening ? "⏹ Stop" : "🎤 Speak"}
+        </button>
+        <button className="save-button" onClick={saveEntry}>
+          Save Entry
+        </button>
+      </div>
+    </div>
+  )}
+
+  {activeTab === "task" && (
+    <div className="tab-content">
+      <div className="task-title-row">
+        <input
+          type="text"
+          className="task-input"
+          placeholder="Task title..."
+          value={taskTitle}
+          onChange={(e) => setTaskTitle(e.target.value)}
+        />
+        <button
+          className={`mic-button small ${isListeningTask ? "listening" : ""}`}
+          onClick={() =>
+            isListeningTask
+              ? stopListening(setIsListeningTask)
+              : startListening(setTaskTitle, setIsListeningTask)
+          }
+        >
+          {isListeningTask ? "⏹" : "🎤"}
+        </button>
+      </div>
+      <input
+        type="datetime-local"
+        className="task-date-input"
+        value={taskDueAt}
+        onChange={(e) => setTaskDueAt(e.target.value)}
+      />
+      <button className="save-button" onClick={saveTask}>
+        Add Task
+      </button>
+    </div>
+  )}
+</div>
+
+            {/* Today's Entries List */}
+            {/* Bottom Two Column Row */}
+<div className="bottom-row">
+
+{/* Today's Entries List */}
+<section className="today-entries">
+  <h3 className="today-entries-heading">
+    📅 Today's Entries
+    <span className="today-count">{todayEntries.length}</span>
+  </h3>
+  {todayEntries.length === 0 ? (
+    <p className="no-today-entries">
+      No entries yet today. Start writing above.
+    </p>
+  ) : (
+    todayEntries.map((e) => (
+      <div
+        key={e.id}
+        className="today-entry-card"
+        onClick={() => openItem(e, "entry")}
+      >
+        <p className="today-entry-time">{formatTime(e.created_at)}</p>
+        <p className="today-entry-content">{e.content}</p>
+      </div>
+    ))
+  )}
+</section>
+
+{/* Upcoming Tasks List */}
+<section className="today-entries">
+  <h3 className="today-entries-heading">
+    📌 Upcoming Tasks
+    <span className="today-count">{tasks.length}</span>
+  </h3>
+  {tasks.length === 0 ? (
+    <p className="no-today-entries">
+      No upcoming tasks. Add one above.
+    </p>
+  ) : (
+    tasks.map((task) => (
+      <div
+        key={task.id}
+        className="today-entry-card"
+        onClick={() => openItem(task, "task")}
+      >
+        <p className="today-entry-time">{formatTime(task.due_at)}</p>
+        <p className="today-entry-content">{task.title}</p>
+      </div>
+    ))
+  )}
+</section>
+
+</div>
           </>
         )}
 
