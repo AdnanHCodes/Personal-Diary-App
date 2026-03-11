@@ -1,9 +1,36 @@
-:root {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  background-color: #f5f0eb;
+  font-family: 'JetBrains Mono', monospace;
+  background-color: #0d0f14;
+  color: #c8d0e0;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e2330;
+  border-radius: 2px;
+}
+
+input, textarea, button {
+  font-family: 'JetBrains Mono', monospace;
 }

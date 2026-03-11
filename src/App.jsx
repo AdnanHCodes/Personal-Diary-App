@@ -11,11 +11,14 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueAt, setTaskDueAt] = useState("");
-  const [expandedEntry, setExpandedEntry] = useState(null);
-  const [expandedTask, setExpandedTask] = useState(null);
   const [showEntries, setShowEntries] = useState(true);
   const [showTasks, setShowTasks] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [centerView, setCenterView] = useState("new");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     loadEntries();
@@ -117,8 +120,86 @@ function App() {
     });
   };
 
-  const getPreview = (text, length = 40) => {
+  const getPreview = (text, length = 35) => {
     return text.length > length ? text.substring(0, length) + "..." : text;
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  const openItem = (item, type) => {
+    setSelectedItem(item);
+    setSelectedType(type);
+    setEditContent(type === "entry" ? item.content : item.title);
+    setIsEditing(false);
+    setCenterView("view");
+  };
+
+  const closeItem = () => {
+    setSelectedItem(null);
+    setSelectedType(null);
+    setEditContent("");
+    setIsEditing(false);
+    setCenterView("new");
+  };
+
+  const saveEdit = async () => {
+    if (editContent.trim() === "") return;
+    setConfirmAction({
+      message: "Are you sure you want to save your changes?",
+      onConfirm: async () => {
+        if (selectedType === "entry") {
+          const cleaned = applyPunctuation(editContent);
+          const { error } = await supabase
+            .from("entries")
+            .update({ content: cleaned })
+            .eq("id", selectedItem.id);
+          if (!error) {
+            setEntries(entries.map((e) =>
+              e.id === selectedItem.id ? { ...e, content: cleaned } : e
+            ));
+            setSelectedItem({ ...selectedItem, content: cleaned });
+            setEditContent(cleaned);
+          }
+        } else {
+          const { error } = await supabase
+            .from("tasks")
+            .update({ title: editContent })
+            .eq("id", selectedItem.id);
+          if (!error) {
+            setTasks(tasks.map((t) =>
+              t.id === selectedItem.id ? { ...t, title: editContent } : t
+            ));
+            setSelectedItem({ ...selectedItem, title: editContent });
+          }
+        }
+        setIsEditing(false);
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
+  };
+
+  const deleteItem = () => {
+    setConfirmAction({
+      message: `Are you sure you want to delete this ${selectedType === "entry" ? "diary entry" : "task"}?`,
+      onConfirm: async () => {
+        if (selectedType === "entry") {
+          await supabase.from("entries").delete().eq("id", selectedItem.id);
+          setEntries(entries.filter((e) => e.id !== selectedItem.id));
+        } else {
+          await supabase.from("tasks").delete().eq("id", selectedItem.id);
+          setTasks(tasks.filter((t) => t.id !== selectedItem.id));
+        }
+        closeItem();
+        setConfirmAction(null);
+      },
+      onCancel: () => setConfirmAction(null),
+    });
   };
 
   const saveEntry = async () => {
@@ -163,30 +244,6 @@ function App() {
           setTaskTitle("");
           setTaskDueAt("");
         }
-        setConfirmAction(null);
-      },
-      onCancel: () => setConfirmAction(null),
-    });
-  };
-
-  const deleteTask = (id) => {
-    setConfirmAction({
-      message: "Are you sure you want to delete this task?",
-      onConfirm: async () => {
-        await supabase.from("tasks").delete().eq("id", id);
-        setTasks(tasks.filter((t) => t.id !== id));
-        setConfirmAction(null);
-      },
-      onCancel: () => setConfirmAction(null),
-    });
-  };
-
-  const deleteEntry = (id) => {
-    setConfirmAction({
-      message: "Are you sure you want to delete this diary entry?",
-      onConfirm: async () => {
-        await supabase.from("entries").delete().eq("id", id);
-        setEntries(entries.filter((e) => e.id !== id));
         setConfirmAction(null);
       },
       onCancel: () => setConfirmAction(null),
@@ -248,13 +305,9 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1>📔 My Diary</h1>
-          <p className="sidebar-date">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            })}
-          </p>
+          <button className="new-entry-button" onClick={closeItem}>
+            + New Entry
+          </button>
         </div>
 
         {/* Entries List */}
@@ -276,28 +329,11 @@ function App() {
                 entries.map((e) => (
                   <div
                     key={e.id}
-                    className={`sidebar-item ${expandedEntry === e.id ? "active" : ""}`}
+                    className={`sidebar-item ${selectedItem?.id === e.id ? "active" : ""}`}
+                    onClick={() => openItem(e, "entry")}
                   >
-                    <div
-                      className="sidebar-item-header"
-                      onClick={() =>
-                        setExpandedEntry(expandedEntry === e.id ? null : e.id)
-                      }
-                    >
-                      <p className="sidebar-item-date">{formatDateTime(e.created_at)}</p>
-                      <p className="sidebar-item-preview">{getPreview(e.content)}</p>
-                    </div>
-                    {expandedEntry === e.id && (
-                      <div className="sidebar-item-expanded">
-                        <p className="sidebar-item-content">{e.content}</p>
-                        <button
-                          className="sidebar-delete"
-                          onClick={() => deleteEntry(e.id)}
-                        >
-                          🗑 Delete Entry
-                        </button>
-                      </div>
-                    )}
+                    <p className="sidebar-item-date">{formatDateTime(e.created_at)}</p>
+                    <p className="sidebar-item-preview">{getPreview(e.content)}</p>
                   </div>
                 ))
               )}
@@ -322,28 +358,11 @@ function App() {
                 tasks.map((task) => (
                   <div
                     key={task.id}
-                    className={`sidebar-item ${expandedTask === task.id ? "active" : ""}`}
+                    className={`sidebar-item ${selectedItem?.id === task.id ? "active" : ""}`}
+                    onClick={() => openItem(task, "task")}
                   >
-                    <div
-                      className="sidebar-item-header"
-                      onClick={() =>
-                        setExpandedTask(expandedTask === task.id ? null : task.id)
-                      }
-                    >
-                      <p className="sidebar-item-date">{formatDateTime(task.due_at)}</p>
-                      <p className="sidebar-item-preview">{getPreview(task.title)}</p>
-                    </div>
-                    {expandedTask === task.id && (
-                      <div className="sidebar-item-expanded">
-                        <p className="sidebar-item-content">{task.title}</p>
-                        <button
-                          className="sidebar-delete"
-                          onClick={() => deleteTask(task.id)}
-                        >
-                          🗑 Delete Task
-                        </button>
-                      </div>
-                    )}
+                    <p className="sidebar-item-date">{formatDateTime(task.due_at)}</p>
+                    <p className="sidebar-item-preview">{getPreview(task.title)}</p>
                   </div>
                 ))
               )}
@@ -354,86 +373,156 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header className="main-header">
-          <h2>Good {new Date().getHours() < 12 ? "Morning" : new Date().getHours() < 18 ? "Afternoon" : "Evening"} 👋</h2>
-          <p className="main-date">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        </header>
 
-        {/* New Diary Entry */}
-        <section className="card">
-          <h3>Today's Entry</h3>
-          <textarea
-            className="entry-input"
-            placeholder="Write about your day or press the microphone to speak..."
-            value={entry}
-            onChange={(e) => setEntry(e.target.value)}
-          />
-          <div className="voice-hints">
-            <span>Voice commands:</span>
-            <code>comma</code>
-            <code>period</code>
-            <code>question mark</code>
-            <code>exclamation mark</code>
-            <code>new line</code>
-          </div>
-          <div className="button-group">
-            <button
-              className={`mic-button ${isListening ? "listening" : ""}`}
-              onClick={() =>
-                isListening
-                  ? stopListening(setIsListening)
-                  : startListening(setEntry, setIsListening)
-              }
-            >
-              {isListening ? "⏹ Stop" : "🎤 Speak"}
-            </button>
-            <button className="save-button" onClick={saveEntry}>
-              Save Entry
-            </button>
-          </div>
-        </section>
+        {centerView === "new" && (
+          <>
+            <header className="main-header">
+              <h2>{getGreeting()} 👋</h2>
+              <p className="main-date">
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </header>
 
-        {/* New Task */}
-        <section className="card">
-          <h3>Add a Task</h3>
-          <div className="task-title-row">
-            <input
-              type="text"
-              className="task-input"
-              placeholder="Task title..."
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-            />
-            <button
-              className={`mic-button small ${isListeningTask ? "listening" : ""}`}
-              onClick={() =>
-                isListeningTask
-                  ? stopListening(setIsListeningTask)
-                  : startListening(setTaskTitle, setIsListeningTask)
-              }
-            >
-              {isListeningTask ? "⏹" : "🎤"}
-            </button>
+            {/* New Diary Entry */}
+            <section className="card">
+              <h3>Today's Entry</h3>
+              <textarea
+                className="entry-input"
+                placeholder="Write about your day or press the microphone to speak..."
+                value={entry}
+                onChange={(e) => setEntry(e.target.value)}
+              />
+              <div className="voice-hints">
+                <span>Voice commands:</span>
+                <code>comma</code>
+                <code>period</code>
+                <code>question mark</code>
+                <code>exclamation mark</code>
+                <code>new line</code>
+              </div>
+              <div className="button-group">
+                <button
+                  className={`mic-button ${isListening ? "listening" : ""}`}
+                  onClick={() =>
+                    isListening
+                      ? stopListening(setIsListening)
+                      : startListening(setEntry, setIsListening)
+                  }
+                >
+                  {isListening ? "⏹ Stop" : "🎤 Speak"}
+                </button>
+                <button className="save-button" onClick={saveEntry}>
+                  Save Entry
+                </button>
+              </div>
+            </section>
+
+            {/* New Task */}
+            <section className="card">
+              <h3>Add a Task</h3>
+              <div className="task-title-row">
+                <input
+                  type="text"
+                  className="task-input"
+                  placeholder="Task title..."
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                />
+                <button
+                  className={`mic-button small ${isListeningTask ? "listening" : ""}`}
+                  onClick={() =>
+                    isListeningTask
+                      ? stopListening(setIsListeningTask)
+                      : startListening(setTaskTitle, setIsListeningTask)
+                  }
+                >
+                  {isListeningTask ? "⏹" : "🎤"}
+                </button>
+              </div>
+              <input
+                type="datetime-local"
+                className="task-date-input"
+                value={taskDueAt}
+                onChange={(e) => setTaskDueAt(e.target.value)}
+              />
+              <button className="save-button" onClick={saveTask}>
+                Add Task
+              </button>
+            </section>
+          </>
+        )}
+
+        {centerView === "view" && selectedItem && (
+          <div className="view-panel">
+            <div className="view-panel-header">
+              <div>
+                <span className="view-panel-type">
+                  {selectedType === "entry" ? "📝 Diary Entry" : "📌 Task"}
+                </span>
+                <p className="view-panel-date">
+                  {formatDateTime(
+                    selectedType === "entry"
+                      ? selectedItem.created_at
+                      : selectedItem.due_at
+                  )}
+                </p>
+              </div>
+              <button className="close-button" onClick={closeItem}>✕</button>
+            </div>
+
+            {isEditing ? (
+              <textarea
+                className="entry-input edit-input"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            ) : (
+              <p className="view-panel-content">
+                {selectedType === "entry"
+                  ? selectedItem.content
+                  : selectedItem.title}
+              </p>
+            )}
+
+            <div className="view-panel-actions">
+              {isEditing ? (
+                <>
+                  <button className="save-button" onClick={saveEdit}>
+                    Save Changes
+                  </button>
+                  <button
+                    className="cancel-edit-button"
+                    onClick={() => setIsEditing(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="edit-button"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    className="delete-button"
+                    onClick={deleteItem}
+                  >
+                    🗑 Delete
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          <input
-            type="datetime-local"
-            className="task-date-input"
-            value={taskDueAt}
-            onChange={(e) => setTaskDueAt(e.target.value)}
-          />
-          <button className="save-button" onClick={saveTask}>
-            Add Task
-          </button>
-        </section>
+        )}
       </main>
     </div>
   );
