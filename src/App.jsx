@@ -459,29 +459,33 @@ function App() {
         value={entry}
         onChange={(e) => setEntry(e.target.value)}
       />
-      <div className="voice-hints">
-        <span>Voice commands:</span>
-        <code>comma</code>
-        <code>period</code>
-        <code>question mark</code>
-        <code>exclamation mark</code>
-        <code>new line</code>
-      </div>
-      <div className="button-group">
-        <button
-          className={`mic-button ${isListening ? "listening" : ""}`}
-          onClick={() =>
-            isListening
-              ? stopListening(setIsListening)
-              : startListening(setEntry, setIsListening)
-          }
-        >
-          {isListening ? "⏹ Stop" : "🎤 Speak"}
-        </button>
-        <button className="save-button" onClick={saveEntry}>
-          Save Entry
-        </button>
-      </div>
+      
+<div className="hints-and-buttons">
+  <div className="voice-hints">
+    <span>Voice commands:</span>
+    <code>comma</code>
+    <code>period</code>
+    <code>question mark</code>
+    <code>exclamation mark</code>
+    <code>new line</code>
+  </div>
+  <div className="button-group">
+    <button
+      className={`mic-button ${isListening ? "listening" : ""}`}
+      onClick={() =>
+        isListening
+          ? stopListening(setIsListening)
+          : startListening(setEntry, setIsListening)
+      }
+    >
+      {isListening ? "⏹ Stop" : "🎤 Speak"}
+    </button>
+    <button className="save-button" onClick={saveEntry}>
+      Save Entry
+    </button>
+  </div>
+</div>
+
     </div>
   )}
 
